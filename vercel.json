@@ -23,15 +23,15 @@
     },
     {
       "src": "/assets/(.*)",
-      "dest": "/assets/$1"
+      "dest": "web/dist/assets/$1"
     },
     {
       "src": "/favicon.ico",
-      "dest": "/favicon.ico"
+      "dest": "web/dist/favicon.ico"
     },
     {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "web/dist/index.html"
     }
   ]
 }
