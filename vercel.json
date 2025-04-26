@@ -19,7 +19,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/dist/main.js"
+      "dest": "/api/dist/api/src/main.js"
     },
     {
       "src": "/assets/(.*)",
