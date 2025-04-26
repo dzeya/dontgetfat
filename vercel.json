@@ -23,19 +23,22 @@
     },
     {
       "src": "/assets/(.*)",
-      "dest": "/assets/$1"
+      "dest": "/web/dist/assets/$1"
     },
     {
       "src": "/favicon.ico",
-      "dest": "/favicon.ico"
+      "dest": "/web/dist/favicon.ico"
     },
     {
       "src": "/vite.svg",
-      "dest": "/vite.svg"
+      "dest": "/web/dist/vite.svg"
     },
     {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "handle": "filesystem"
+    },
+    {
+      "src": "/.*",
+      "dest": "/web/dist/index.html"
     }
   ]
 }
