@@ -1,4 +1,4 @@
-import { MealPlan as OpenAIMealPlan } from './services/openai'; // Alias to avoid name clash if needed
+import { MealPlan as SharedMealPlan } from '../../types/meal'; // Import directly from shared types
 
 // Represents the detailed data collected during onboarding
 export interface FormData {
@@ -36,4 +36,4 @@ export interface GroceryItem {
 }
 
 // Re-exporting the MealPlan type from the service for easier access if needed elsewhere
-export type MealPlan = OpenAIMealPlan;
+export type MealPlan = SharedMealPlan; // Use the imported shared type
