@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { fal } from '@fal-ai/client'; // Import fal
+import { fal } from '@fal-ai/serverless-client'; // Import fal
 
 @Injectable()
 export class ImageGenerationService {
