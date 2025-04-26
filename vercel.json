@@ -3,19 +3,34 @@
   "buildCommand": "cd web && npm install && npm run build && cd ../api && npm install --legacy-peer-deps && npm run build",
   "outputDirectory": "web/dist",
   "framework": "vite",
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/:path*",
-      "destination": "/api"
+      "src": "/api/(.*)",
+      "dest": "api/vercel.js"
     },
     {
-      "source": "/:path*",
-      "destination": "/"
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ],
-  "functions": {
-    "api/vercel.js": {
-      "maxDuration": 60
+  "builds": [
+    {
+      "src": "web/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    },
+    {
+      "src": "api/vercel.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["api/dist/**"],
+        "maxDuration": 60
+      }
     }
-  }
+  ]
 }
