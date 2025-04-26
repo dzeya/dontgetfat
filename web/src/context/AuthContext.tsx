@@ -4,27 +4,26 @@ import { supabase } from '../lib/supabaseClient';
 
 // Define Profile type based on table structure
 // Ensure this matches the columns in your 'profiles' table
-interface Profile {
+export interface Profile {
   id: string;
   updated_at?: string;
   username?: string;
   full_name?: string;
   avatar_url?: string;
   website?: string;
-  // Fields from FormData
   goals?: string[];
-  otherGoals?: string;
+  other_goals?: string;
   allergies?: string[];
-  specificAllergies?: string;
-  dietaryChoice?: string;
+  specific_allergies?: string;
+  dietary_choice?: string;
   dislikes?: string;
-  cookingTime?: string;
-  batchCooking?: boolean;
-  householdSize?: string;
-  mealsPerDay?: string; // Add if needed based on your table
-  cookingDaysPerWeek?: string; // Add if needed based on your table
-  favoriteCuisines?: string[];
-  favoriteMeals?: string;
+  cooking_time?: string;
+  batch_cooking?: boolean;
+  household_size?: string;
+  meals_per_day?: string; // Add if needed based on your table
+  cooking_days_per_week?: string; // Add if needed based on your table
+  favorite_cuisines?: string[];
+  favorite_meals?: string;
 }
 
 interface AuthContextType {
@@ -63,18 +62,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           avatar_url,
           website,
           goals,
-          otherGoals,
+          other_goals,
           allergies,
-          specificAllergies,
-          dietaryChoice,
+          specific_allergies,
+          dietary_choice,
           dislikes,
-          cookingTime,
-          batchCooking,
-          householdSize,
-          mealsPerDay,
-          cookingDaysPerWeek,
-          favoriteCuisines,
-          favoriteMeals
+          cooking_time,
+          batch_cooking,
+          household_size,
+          meals_per_day,
+          cooking_days_per_week,
+          favorite_cuisines,
+          favorite_meals
         `)
         .eq('id', user.id)
         .single();
@@ -94,18 +93,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           avatar_url: data.avatar_url,
           website: data.website,
           goals: data.goals || [],
-          otherGoals: data.otherGoals || '',
+          other_goals: data.other_goals || '',
           allergies: data.allergies || [],
-          specificAllergies: data.specificAllergies || '',
-          dietaryChoice: data.dietaryChoice || 'None/No specific diet',
+          specific_allergies: data.specific_allergies || '',
+          dietary_choice: data.dietary_choice || 'None/No specific diet',
           dislikes: data.dislikes || '',
-          cookingTime: data.cookingTime || '🍳 Standard (15-30 mins)',
-          batchCooking: data.batchCooking || false,
-          householdSize: data.householdSize || 'Just Me (1)',
-          mealsPerDay: data.mealsPerDay, // Map new fields
-          cookingDaysPerWeek: data.cookingDaysPerWeek, // Map new fields
-          favoriteCuisines: data.favoriteCuisines || [],
-          favoriteMeals: data.favoriteMeals || '',
+          cooking_time: data.cooking_time || '🍳 Standard (15-30 mins)',
+          batch_cooking: data.batch_cooking || false,
+          household_size: data.household_size || 'Just Me (1)',
+          meals_per_day: data.meals_per_day, // Map new fields
+          cooking_days_per_week: data.cooking_days_per_week, // Map new fields
+          favorite_cuisines: data.favorite_cuisines || [],
+          favorite_meals: data.favorite_meals || '',
         });
       } else {
         console.log('No profile data found for user, might be first login.');

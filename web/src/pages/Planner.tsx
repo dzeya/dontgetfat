@@ -1,9 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useMealPlan } from '../MealPlanContext'
 import {
   Box,
   Card,
-  Chip, // Add Chip import
+  Chip, 
   Typography,
   Button,
   Grid,
@@ -13,23 +13,22 @@ import {
   Container,
   Checkbox
 } from '@mui/material'
-import DownloadIcon from '@mui/icons-material/Download'; // Icon for download button
-import ListAltIcon from '@mui/icons-material/ListAlt'; // Icon for grocery list button
-import RefreshIcon from '@mui/icons-material/Refresh'; // Icon for regenerate button
-import { Link as RouterLink } from 'react-router-dom'; // Import RouterLink for navigation
-import { useTheme } from '@mui/material/styles'; // Import useTheme
+import DownloadIcon from '@mui/icons-material/Download'; 
+import ListAltIcon from '@mui/icons-material/ListAlt'; 
+import RefreshIcon from '@mui/icons-material/Refresh'; 
+import { Link as RouterLink } from 'react-router-dom'; 
+import { useTheme } from '@mui/material/styles'; 
 
-import { PDFDownloadLink } from '@react-pdf/renderer'; // Import PDFDownloadLink
-import MealPlanPDF from '../components/MealPlanPDF'; // Import the PDF document component
+import { PDFDownloadLink } from '@react-pdf/renderer'; 
+import MealPlanPDF from '../components/MealPlanPDF'; 
 
-// Import the API function
-import { generateAllMealImagesAPI } from '../services/openai'; // Import bulk generation function
+import { generateAllMealImagesAPI } from '../services/openai'; 
 
-// Define Props for Planner component
+import { useAuth } from '../context/AuthContext';
+
 interface PlannerProps {
 }
 
-// Map meal types to emojis (like reference)
 const emojiMap: { [key: string]: string } = { 
   Breakfast: "🍳", 
   Lunch: "🥪", 
@@ -40,23 +39,23 @@ const emojiMap: { [key: string]: string } = {
 
 const getDayName = (dayNumber: number): string => {
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  // Adjust for 1-based indexing if dayNumber starts from 1
   return days[dayNumber - 1] || `Day ${dayNumber}`;
 }
 
 const Planner: React.FC<PlannerProps> = () => { 
-  const theme = useTheme(); // Get theme for transitions
+  const theme = useTheme(); 
   const { 
     mealPlan, 
-    isLoading: contextIsLoading, 
-    error: contextError, 
-    regenerateSelectedMeals, // Get the function from context
-    isRegenerating,        // Get loading state
-    regenerateError        // Get error state
+    isLoading, 
+    error, 
+    regenerateSelectedMeals, 
+    isRegenerating,        
+    regenerateError,        
+    generateAndSetMealPlan
   } = useMealPlan()
+  const { profile } = useAuth(); 
   const [selectedMeals, setSelectedMeals] = React.useState<Set<string>>(new Set());
 
-  // State for bulk image generation
   const [allMealImages, setAllMealImages] = useState<Record<string, string | null>>({});
   const [isGeneratingAllImages, setIsGeneratingAllImages] = useState<boolean>(false);
   const [generateAllError, setGenerateAllError] = useState<string | null>(null);
@@ -74,25 +73,19 @@ const Planner: React.FC<PlannerProps> = () => {
     });
   };
 
-  // Define the handler function for regeneration
-  const handleRegenerateSelected = async () => { // Make async
+  const handleRegenerateSelected = async () => { 
     console.log("Regenerate clicked for meals:", Array.from(selectedMeals));
-    // Call context function
     await regenerateSelectedMeals(Array.from(selectedMeals));
-    // Optionally clear selection after regeneration
-    // setSelectedMeals(new Set()); 
   };
 
-  // --- Handler for generating all meal images ---
   const handleGenerateAllImages = async () => {
     if (!mealPlan) return;
 
     console.log('Starting generation for all meal images...');
     setIsGeneratingAllImages(true);
     setGenerateAllError(null);
-    setAllMealImages({}); // Clear previous images
+    setAllMealImages({}); 
 
-    // Collect unique meal names
     const mealNames = new Set<string>();
     mealPlan.days.forEach(day => {
       day.meals.forEach(meal => {
@@ -123,8 +116,15 @@ const Planner: React.FC<PlannerProps> = () => {
     }
   };
 
-  // Loading state
-  if (contextIsLoading) {
+  useEffect(() => {
+    console.log("[Planner Effect] Checking for initial generation. Profile:", !!profile, "Meal Plan:", !!mealPlan, "Loading:", isLoading);
+    if (profile && !mealPlan && !isLoading && !error) {
+      console.log("[Planner Effect] Conditions met for initial generation. Calling generateAndSetMealPlan...");
+      generateAndSetMealPlan(profile); 
+    }
+  }, [profile, mealPlan, isLoading, error, generateAndSetMealPlan]); 
+
+  if (isLoading) {
     return (
       <Container sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
         <CircularProgress />
@@ -132,13 +132,12 @@ const Planner: React.FC<PlannerProps> = () => {
     );
   }
 
-  // Error state
-  if (contextError) {
+  if (error) {
     return (
       <Container sx={{ textAlign: 'center', mt: 5 }}>
-        <Alert severity="error">Error loading or generating meal plan: {contextError}</Alert>
+        <Alert severity="error">Error loading or generating meal plan: {error}</Alert>
         <Button 
-          component={RouterLink} // Use RouterLink here
+          component={RouterLink} 
           to="/meal-plan-onboarding" 
           variant="contained" 
           color="primary" 
@@ -150,7 +149,6 @@ const Planner: React.FC<PlannerProps> = () => {
     );
   }
 
-  // No meal plan generated yet state
   if (!mealPlan) {
     return (
       <Container sx={{ textAlign: 'center', mt: 5 }}>
@@ -161,7 +159,7 @@ const Planner: React.FC<PlannerProps> = () => {
           Please complete the onboarding process to generate your personalized plan.
         </Typography>
         <Button 
-          component={RouterLink} // Use RouterLink here
+          component={RouterLink} 
           to="/meal-plan-onboarding" 
           variant="contained" 
           color="primary"
@@ -178,17 +176,14 @@ const Planner: React.FC<PlannerProps> = () => {
         Your Weekly Meal Plan
       </Typography>
       
-      {/* Removed Preferences Card */}
-
-      {/* Action Buttons Grouped */}
       <Box display="flex" justifyContent="center" gap={2} sx={{ mb: 5 }}>
         <Button
-          component={RouterLink} // Use RouterLink here
+          component={RouterLink} 
           to="/grocery"
           variant="contained"
           color="secondary" 
           startIcon={<ListAltIcon />}
-          disabled={!mealPlan} // Disable if no plan exists
+          disabled={!mealPlan} 
         >
           View Grocery List
         </Button>
@@ -196,7 +191,7 @@ const Planner: React.FC<PlannerProps> = () => {
           <PDFDownloadLink
             document={<MealPlanPDF mealPlan={mealPlan} />}
             fileName="weekly-meal-plan.pdf"
-            style={{ textDecoration: 'none' }} // Remove underline from link
+            style={{ textDecoration: 'none' }} 
           >
             {({ loading }) => (
               <Button
@@ -210,29 +205,26 @@ const Planner: React.FC<PlannerProps> = () => {
             )}
           </PDFDownloadLink>
         )}
-        {/* Regenerate Button */}
         <Button
           variant="contained"
-          color="secondary" // Using secondary for consistency, can change
+          color="secondary" 
           onClick={handleRegenerateSelected}
-          disabled={selectedMeals.size === 0 || isRegenerating || contextIsLoading} // Disable when regenerating or initially loading
+          disabled={selectedMeals.size === 0 || isRegenerating || isLoading} 
           startIcon={isRegenerating ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
         >
           {isRegenerating ? 'Regenerating...' : `Regenerate Selected (${selectedMeals.size})`}
         </Button>
-        {/* Generate All Images Button */}
         <Button
           variant="contained"
           color="secondary"
           onClick={handleGenerateAllImages}
-          disabled={isGeneratingAllImages || !mealPlan || contextIsLoading}
+          disabled={isGeneratingAllImages || !mealPlan || isLoading}
           startIcon={isGeneratingAllImages ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
         >
           {isGeneratingAllImages ? 'Generating...' : `Generate All Images`}
         </Button>
       </Box>
 
-      {/* Display Regeneration Error */} 
       {regenerateError && (
         <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
           <Alert severity="error" sx={{ width: 'fit-content' }}>
@@ -240,7 +232,6 @@ const Planner: React.FC<PlannerProps> = () => {
           </Alert>
         </Box>
       )}
-      {/* Display Bulk Image Generation Error */}
       {generateAllError && (
         <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
           <Alert severity="error" sx={{ width: 'fit-content' }}>
@@ -249,84 +240,77 @@ const Planner: React.FC<PlannerProps> = () => {
         </Box>
       )}
 
-      {/* Planner Content Area */}
-      {/* Display Meal Plan Grid */}
-      {!contextIsLoading && !contextError && mealPlan && mealPlan.days && mealPlan.days.length > 0 ? (
-        <Stack spacing={5}> {/* Increased spacing between days */}
-          {mealPlan.days.map((day, dayIndex) => (
-            <Box key={dayIndex}>
-              <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 600, borderBottom: 1, borderColor: 'divider', pb: 1, mb: 3 }}>
-                {getDayName(day.day)} 
-              </Typography>
-              <Grid container spacing={3} sx={{ 
-                display: 'grid',
-                gridTemplateColumns: {
-                  xs: '1fr',
-                  sm: 'repeat(2, 1fr)',
-                  md: 'repeat(3, 1fr)',
-                  lg: 'repeat(3, 1fr)'
-                },
-                gap: { xs: 2, sm: 3 }, // Consistent gap between cards (16-20px)
-                maxWidth: '1200px',
-                mx: 'auto'
-              }}> 
-                {day.meals && day.meals.map((meal, mealIndex) => {
-                  if (!meal) return null; // Skip if meal is undefined
-                  
-                  const { name, type, ingredients } = meal;
+      <Stack spacing={5}> 
+        {mealPlan.days.map((day, dayIndex) => (
+          <Box key={dayIndex}>
+            <Typography variant="h5" component="h2" gutterBottom sx={{ fontWeight: 600, borderBottom: 1, borderColor: 'divider', pb: 1, mb: 3 }}>
+              {getDayName(day.day)} 
+            </Typography>
+            <Grid container spacing={3} sx={{ 
+              display: 'grid',
+              gridTemplateColumns: {
+                xs: '1fr',
+                sm: 'repeat(2, 1fr)',
+                md: 'repeat(3, 1fr)',
+                lg: 'repeat(3, 1fr)'
+              },
+              gap: { xs: 2, sm: 3 }, 
+              maxWidth: '1200px',
+              mx: 'auto'
+            }}> 
+              {day.meals && day.meals.map((meal, mealIndex) => {
+                if (!meal) return null; 
+                
+                const { name, type, ingredients } = meal;
 
-                  // ** Updated Ingredient Display Logic: Show all ingredients, allow wrapping **
-                  const ingredientsArray = Array.isArray(ingredients) ? ingredients : 
-                    (typeof ingredients === 'string' ? [ingredients] : []);
-                  
-                  // Filter out empty strings and null/undefined values
-                  const filteredIngredients = ingredientsArray.filter(ingredient => 
-                    ingredient && typeof ingredient === 'string' && ingredient.trim() !== ''
-                  );
-                  
-                  return (
-                    <Box 
-                      key={mealIndex} 
+                const ingredientsArray = Array.isArray(ingredients) ? ingredients : 
+                  (typeof ingredients === 'string' ? [ingredients] : []);
+                
+                const filteredIngredients = ingredientsArray.filter(ingredient => 
+                  ingredient && typeof ingredient === 'string' && ingredient.trim() !== ''
+                );
+                
+                return (
+                  <Box 
+                    key={mealIndex} 
+                    sx={{ 
+                      width: '100%',
+                      maxWidth: '400px',
+                      minWidth: '300px',
+                      margin: '0 auto'
+                    }}
+                  >
+                    <Card 
+                      variant="outlined" 
                       sx={{ 
                         width: '100%',
-                        maxWidth: '400px',
-                        minWidth: '300px',
-                        margin: '0 auto'
-                      }}
-                    >
-                      <Card 
-                        variant="outlined" 
-                        sx={{ 
-                          width: '100%',
-                          height: '380px', // Fixed height for all cards
-                          display: 'flex', 
-                          flexDirection: 'column',
-                          borderRadius: '12px', // More modern look
-                          bgcolor: 'white',
-                          boxShadow: '0px 2px 8px rgba(0,0,0,0.08)', // Subtle drop shadow
-                          border: '1px solid #eaeaea', // Light border
-                          overflow: 'hidden',
-                          transition: 'all 0.2s ease',
-                          '&:hover': {
-                            boxShadow: '0px 4px 12px rgba(0,0,0,0.12)', // Elevated shadow on hover
-                            borderColor: '#d0d0d0' // Border highlight on hover
-                          }
+                        height: '380px', 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        borderRadius: '12px', 
+                        bgcolor: 'white',
+                        boxShadow: '0px 2px 8px rgba(0,0,0,0.08)', 
+                        border: '1px solid #eaeaea', 
+                        overflow: 'hidden',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          boxShadow: '0px 4px 12px rgba(0,0,0,0.12)', 
+                          borderColor: '#d0d0d0' 
+                        }
                       }}>
-                        {/* Image container with fixed 3:2 aspect ratio */}
                         <Box sx={{ 
                           position: 'relative',
                           width: '100%',
-                          height: '200px', // 3:2 aspect ratio for 400px width (reduced height)
+                          height: '200px', 
                           overflow: 'hidden',
-                          bgcolor: '#f8f8f8' // Light background for images
+                          bgcolor: '#f8f8f8' 
                         }}>
-                          {/* Meal Type Emoji */}
                           <Chip
                             label={(() => {
                               const formattedType = typeof type === 'string' && type.length > 0
                                 ? type.charAt(0).toUpperCase() + type.slice(1).toLowerCase()
                                 : '';
-                              return emojiMap[formattedType] || '🍲'; // Use formatted type for lookup
+                              return emojiMap[formattedType] || '🍲'; 
                             })()}
                             size="small"
                             sx={{
@@ -336,23 +320,22 @@ const Planner: React.FC<PlannerProps> = () => {
                               bgcolor: 'rgba(0, 0, 0, 0.6)',
                               color: 'white',
                               fontWeight: 500,
-                              '.MuiChip-label': { px: 1 }, // Compact padding
+                              '.MuiChip-label': { px: 1 }, 
                             }}
                           />
 
-                          {/* Estimated Time */}
                           <Chip
-                            label={`⏱️ ${meal.estimated_time} min.`} // Use estimated_time
+                            label={`⏱️ ${meal.estimated_time} min.`} 
                             size="small"
                             sx={{
                               position: 'absolute',
                               top: theme.spacing(1),
-                              right: theme.spacing(1), // Position top-right
-                              bgcolor: 'rgba(255, 255, 255, 0.8)', // Semi-transparent white background
-                              color: theme.palette.text.primary, // Dark text
+                              right: theme.spacing(1), 
+                              bgcolor: 'rgba(255, 255, 255, 0.8)', 
+                              color: theme.palette.text.primary, 
                               fontWeight: 500,
-                              '.MuiChip-label': { px: 1 }, // Compact padding
-                              backdropFilter: 'blur(2px)', // Optional: slight blur effect
+                              '.MuiChip-label': { px: 1 }, 
+                              backdropFilter: 'blur(2px)', 
                             }}
                           />
 
@@ -371,24 +354,22 @@ const Planner: React.FC<PlannerProps> = () => {
                           />
                         </Box>
 
-                        {/* Card content */}
                         <Box sx={{ 
                           p: 2,
                           display: 'flex',
                           flexDirection: 'column',
                           flexGrow: 1,
                           position: 'relative',
-                          height: '180px' // Remaining space of the 380px height
+                          height: '180px' 
                         }}>
-                          {/* Meal name - fixed height with consistent styling */}
                           <Box sx={{ height: '48px', mb: 1 }}>
                             <Typography 
                               variant="h6"
                               sx={{ 
                                 fontWeight: 600, 
-                                fontSize: '1.125rem', // 18px
-                                lineHeight: 1.5, // Improved readability
-                                color: '#333', // Dark gray for titles
+                                fontSize: '1.125rem', 
+                                lineHeight: 1.5, 
+                                color: '#333', 
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
                                 display: '-webkit-box',
@@ -399,7 +380,6 @@ const Planner: React.FC<PlannerProps> = () => {
                             </Typography>
                           </Box>
                           
-                          {/* Ingredients - fixed container with consistent styling */}
                           <Box sx={{ 
                             display: 'flex',
                             flexWrap: 'wrap',
@@ -416,11 +396,11 @@ const Planner: React.FC<PlannerProps> = () => {
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     borderRadius: '16px',
-                                    bgcolor: '#f5f7fa', // Subtle background for tags
-                                    color: '#666', // Medium gray for ingredients
-                                    px: 1.5, // 12px horizontal padding
-                                    py: 0.75, // 8px vertical padding
-                                    fontSize: '0.875rem', // 14px
+                                    bgcolor: '#f5f7fa', 
+                                    color: '#666', 
+                                    px: 1.5, 
+                                    py: 0.75, 
+                                    fontSize: '0.875rem', 
                                     fontWeight: 400,
                                     lineHeight: 1.4,
                                     mb: 0.5,
@@ -447,7 +427,6 @@ const Planner: React.FC<PlannerProps> = () => {
                             )}
                           </Box>
                           
-                          {/* Footer section with action button */}
                           <Box sx={{ 
                             display: 'flex',
                             justifyContent: 'flex-end',
@@ -458,14 +437,12 @@ const Planner: React.FC<PlannerProps> = () => {
                             bottom: 16,
                             right: 16,
                           }}>
-                             {/* Replace custom checkbox with MUI Checkbox */}
-                             <Checkbox 
-                                color="primary"
-                                checked={selectedMeals.has(`${dayIndex}-${mealIndex}`)} // Set checked state
-                                onChange={() => handleCheckboxChange(dayIndex, mealIndex)} // Set onChange handler
-                                aria-label={`Select ${name}`}
-                                // Add state management here if needed later
-                             />
+                            <Checkbox 
+                              color="primary"
+                              checked={selectedMeals.has(`${dayIndex}-${mealIndex}`)} 
+                              onChange={() => handleCheckboxChange(dayIndex, mealIndex)} 
+                              aria-label={`Select ${name}`}
+                            />
                           </Box>
                         </Box>
                       </Card>
@@ -476,14 +453,6 @@ const Planner: React.FC<PlannerProps> = () => {
             </Box>
           ))}
         </Stack>
-      ) : (
-        // Fallback if no meal plan
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 4, flexDirection: 'column', textAlign: 'center' }}>
-          <Typography sx={{ mt: 4, textAlign: 'center', color: 'text.secondary' }}>
-            No meal plan data to display.
-          </Typography>
-        </Box>
-      )}
     </Box>
   )
 }

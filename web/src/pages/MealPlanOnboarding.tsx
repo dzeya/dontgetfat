@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'; // Import useEffect
+import React, { useState } from 'react'; // Import useEffect
 import { useNavigate } from 'react-router-dom';
 import { FormData } from '../types'; // Restore FormData import
 import { useMealPlan } from '../MealPlanContext'; // Import context hook
@@ -58,11 +58,11 @@ const MealPlanOnboarding: React.FC<MealPlanOnboardingProps> = ({
   cuisineOptions
 }) => { 
   const navigate = useNavigate();
-  const { user, profile, loading: authLoading } = useAuth(); // Get user, profile, loading state
-  const { generateAndSetMealPlan, isLoading: isGenerating, error: generationError } = useMealPlan(); 
+  const { user, profile, loading: authLoading, fetchProfile } = useAuth(); // Get user, profile, loading state, and fetchProfile
+  useMealPlan(); // Call the hook to ensure context is used, but don't destructure unused values
   const [activeStep, setActiveStep] = React.useState(0);
   const [isSaving, setIsSaving] = useState(false); // Loading state for saving profile
-  const [saveError, setSaveError] = useState<string | null>(null); // Error state for saving
+  const [saveError, setSaveError] = useState<string | null>(null); // Error state for saving profile
 
   // Internal state for form data, initialized from profile or defaults
   const [formData, setFormData] = useState<FormData>(() => {
@@ -89,7 +89,7 @@ const MealPlanOnboarding: React.FC<MealPlanOnboardingProps> = ({
 
   // Effect to update local formData if profile changes *after* initial load
   // (e.g., profile finishes loading after component mounts)
-  useEffect(() => {
+  React.useEffect(() => {
     if (profile && !authLoading) {
       console.log("Profile loaded/updated, updating onboarding form state:", profile);
       setFormData(prevData => ({ ...prevData, ...profile }));
@@ -262,9 +262,9 @@ const MealPlanOnboarding: React.FC<MealPlanOnboardingProps> = ({
           dietary_choice: dataToSave.dietaryChoice,
           dislikes: dataToSave.dislikes,
           cooking_time: dataToSave.cookingTime,
-          batch_cooking: dataToSave.batchCooking,
+          meals_per_day: dataToSave.mealsPerDay,
           household_size: dataToSave.householdSize,
-          meals_per_day: dataToSave.mealsPerDay, // Added
+          batch_cooking: dataToSave.batchCooking,
           cooking_days_per_week: dataToSave.cookingDaysPerWeek, // Added
           favorite_cuisines: dataToSave.favoriteCuisines,
           favorite_meals: dataToSave.favoriteMeals,
@@ -273,7 +273,11 @@ const MealPlanOnboarding: React.FC<MealPlanOnboardingProps> = ({
         .eq('id', user.id);
 
       if (error) throw error;
-      console.log('Profile saved successfully!');
+
+      // Fetch the updated profile to refresh the context state
+      await fetchProfile(); 
+
+      console.log('Profile saved and context updated successfully!');
       setIsSaving(false);
       return true; // Indicate success
     } catch (err: any) {
@@ -290,13 +294,10 @@ const MealPlanOnboarding: React.FC<MealPlanOnboardingProps> = ({
     const savedSuccessfully = await handleSaveProfile(formData);
 
     if (savedSuccessfully) {
-      // Only generate and navigate if save was successful
-      await generateAndSetMealPlan(); 
-      console.log('Profile saved and meal plan generation triggered.');
-      navigate('/planner'); // Navigate to planner after successful generation
+      navigate('/planner'); // Navigate directly after successful save
     } else {
       // Handle save failure (error message is already set by handleSaveProfile)
-      console.error("Profile save failed, not generating plan or navigating.")
+      console.error("Profile save failed, not triggering generation.")
     }
   };
 
@@ -618,7 +619,7 @@ const MealPlanOnboarding: React.FC<MealPlanOnboardingProps> = ({
             <Button 
               variant="contained" 
               onClick={handleFinishAndGenerate} 
-              disabled={isSaving || isGenerating} // Disable while saving or generating
+              disabled={isSaving} // Disable while saving
               sx={{ mt: 1, mr: 1 }}
             >
               {isSaving ? <CircularProgress size={24} /> : 'Save Preferences & Generate Plan'}
@@ -630,18 +631,12 @@ const MealPlanOnboarding: React.FC<MealPlanOnboardingProps> = ({
               {saveError}
             </Alert>
           )}
-          {/* Display generation error (if save was ok but generation failed - handled on Planner page) */} 
-          {generationError && !saveError && (
-             <Alert severity="warning" sx={{ mt: 2 }}>
-               Preferences saved, but failed to generate initial plan: {generationError}. Proceeding to planner.
-            </Alert>
-          )}
         </Box>
 
         {/* Display Generation Error if it occurs on the last step */}
-        {activeStep === steps.length - 1 && generationError && (
+        {activeStep === steps.length - 1 && (
           <Alert severity="error" sx={{ mt: 2 }}>
-            {generationError}
+            Generation failed.
           </Alert>
         )}
       </Paper>

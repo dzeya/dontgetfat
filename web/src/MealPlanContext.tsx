@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { generateMealPlan as generateMealPlanAPI, regenerateMealsService } from './services/openai';
-import { useAuth } from './context/AuthContext';
+import { useAuth, Profile } from './context/AuthContext';
 import { Meal, MealPlan } from '../../types/meal';
 import { GroceryItem } from './types';
 
@@ -33,7 +33,7 @@ interface MealPlanContextType {
   clearCheckedGroceryItems: () => void;
   isLoading: boolean;
   error: string | null;
-  generateAndSetMealPlan: () => Promise<void>; 
+  generateAndSetMealPlan: (profile: Profile | null) => Promise<void>; 
   isRegenerating: boolean; 
   regenerateError: string | null; 
   regenerateSelectedMeals: (selectedMealKeys: string[]) => Promise<void>; 
@@ -58,7 +58,7 @@ export interface Preferences {
 }
 
 export const MealPlanProvider: React.FC<MealPlanProviderProps> = ({ children }) => {
-  const { profile } = useAuth(); 
+  useAuth(); 
 
   const [preferences, setPreferencesState] = useState<Preferences | null>(() => {
     try {
@@ -252,49 +252,49 @@ export const MealPlanProvider: React.FC<MealPlanProviderProps> = ({ children }) 
     }
   };
 
-  const generateAndSetMealPlan = async (): Promise<void> => {
+  const generateAndSetMealPlan = async (currentProfile: Profile | null): Promise<void> => {
     setIsLoading(true);
     setError(null);
 
-    // Check if profile exists (should be loaded by the time user clicks generate)
-    if (!profile) {
-      console.error("Cannot generate meal plan: User profile not loaded.");
+    // Check the passed-in profile argument
+    if (!currentProfile) { 
+      console.error("Cannot generate meal plan: User profile not provided.");
       setError("User preferences not available. Please ensure you are logged in and have completed onboarding.");
       setIsLoading(false);
       return;
     }
 
-    console.log("Generating meal plan using profile:", profile);
+    console.log("Generating meal plan using provided profile:", currentProfile);
 
-    // --- Construct Preferences directly from profile --- 
+    // --- Construct Preferences directly from currentProfile --- 
     let servings = 1; // Default
-    if (profile.householdSize?.includes('(1)')) servings = 1;
-    if (profile.householdSize?.includes('(2)')) servings = 2;
-    if (profile.householdSize?.includes('(3+)')) servings = 3; // Or adjust as needed
+    if (currentProfile.household_size?.includes('(1)')) servings = 1;
+    if (currentProfile.household_size?.includes('(2)')) servings = 2;
+    if (currentProfile.household_size?.includes('(3+)')) servings = 3; // Or adjust as needed
 
     const dislikes = [
-      ...(profile.allergies || []),
-      profile.specificAllergies,
-      profile.dislikes
+      ...(currentProfile.allergies || []),
+      currentProfile.specific_allergies,
+      currentProfile.dislikes
     ].filter(Boolean).join(', ');
 
     const preferencesString = [
-      `Goals: ${profile.goals?.join(', ') || 'Not specified'}${profile.otherGoals ? '; Other: ' + profile.otherGoals : ''}`,
-      `Dietary Choice: ${profile.dietaryChoice || 'Not specified'}`,
-      `Dislikes/Allergies: ${dislikes || 'None'}`,
-      `Cooking Time Preference: ${profile.cookingTime || 'Not specified'}`,
-      `Likes Batch Cooking: ${profile.batchCooking ? 'Yes' : 'No'}`,
-      `Household Size/Servings: ${profile.householdSize || 'Not specified'} (${servings} servings planned)`,
-      `Meals Per Day: ${profile.mealsPerDay || 'Not specified'}`,
-      `Cooking Days Per Week: ${profile.cookingDaysPerWeek || 'Not specified'}`,
-      `Favorite Cuisines: ${profile.favoriteCuisines?.join(', ') || 'None'}`,
-      `Favorite Meals Examples: ${profile.favoriteMeals || 'None specified'}`,
+      `Goals: ${currentProfile.goals?.join(', ') || 'Not specified'}${currentProfile.other_goals ? '; Other: ' + currentProfile.other_goals : ''}`,
+      `Dietary Choice: ${currentProfile.dietary_choice || 'Not specified'}`,
+      `Dislikes/Allergies: ${dislikes || 'None'}`, 
+      `Cooking Time Preference: ${currentProfile.cooking_time || 'Not specified'}`,
+      `Likes Batch Cooking: ${currentProfile.batch_cooking ? 'Yes' : 'No'}`,
+      `Household Size/Servings: ${currentProfile.household_size || 'Not specified'} (${servings} servings planned)`,
+      `Meals Per Day: ${currentProfile.meals_per_day || 'Not specified'}`,
+      `Cooking Days Per Week: ${currentProfile.cooking_days_per_week || 'Not specified'}`,
+      `Favorite Cuisines: ${currentProfile.favorite_cuisines?.join(', ') || 'None'}`,
+      `Favorite Meals Examples: ${currentProfile.favorite_meals || 'None specified'}`,
     ].join('\n');
 
     console.log("Constructed Preferences String:\n", preferencesString);
 
     const prefsToSave: Preferences = {
-      diet: profile.dietaryChoice || 'None', 
+      diet: currentProfile.dietary_choice || 'None', 
       servings: servings,
       calories: '', // Profile doesn't have calories yet
       dislikes: dislikes,
