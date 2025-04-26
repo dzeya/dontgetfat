@@ -28,7 +28,7 @@ export async function generateMealPlan(
     requestBody.calories = calories;
   }
 
-  const res = await fetch(`/openai/generate-plan`, {
+  const res = await fetch(`/api/openai/generate-plan`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -80,7 +80,7 @@ export const regenerateMealsService = async (
     console.log('With preferences:', preferences);
     console.log('Avoiding previous:', previousMealNames);
 
-    const res = await fetch(`/openai/regenerate-meals`, {
+    const res = await fetch(`/api/openai/regenerate-meals`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -130,7 +130,7 @@ export const regenerateMealsService = async (
 // --- New function to call the image generation endpoint ---
 export async function generateMealImageAPI(mealName: string): Promise<{ imageUrl: string | null }> {
   console.log(`Requesting image generation for: ${mealName}`);
-  const res = await fetch(`/image-generation/generate`, { 
+  const res = await fetch(`/api/image-generation/generate`, { 
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -171,7 +171,7 @@ export async function generateMealImageAPI(mealName: string): Promise<{ imageUrl
 // --- New function to call the BULK image generation endpoint ---
 export async function generateAllMealImagesAPI(meals: { name: string }[]): Promise<Record<string, string | null>> {
   console.log(`Requesting bulk image generation for ${meals.length} meals...`);
-  const res = await fetch(`/image-generation/generate-all`, {
+  const res = await fetch(`/api/image-generation/generate-all`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
