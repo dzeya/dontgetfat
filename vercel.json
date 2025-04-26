@@ -2,24 +2,14 @@
   "version": 2,
   "builds": [
     {
+      "src": "api/package.json",
+      "use": "@vercel/node"
+    },
+    {
       "src": "web/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "maxLambdaSize": "15mb",
-        "installCommand": "npm install",
-        "buildCommand": "npm run build",
-        // Assuming your Vite build output is in 'web/dist'
-        "outputDirectory": "dist" 
-      }
-    },
-    {
-      "src": "api/package.json",
-      "use": "@vercel/node",
-      "config": {
-        "maxLambdaSize": "15mb",
-        "includeFiles": ["dist/**"],
-        "installCommand": "npm install",
-        "buildCommand": "npm run build"
+        "outputDirectory": "dist"
       }
     }
   ],
@@ -28,8 +18,6 @@
       "src": "/api/(.*)",
       "dest": "/api/dist/main.js"
     },
-    // Route remaining traffic to the frontend's index.html
-    // Vercel handles serving static assets from the output dir automatically
     {
       "handle": "filesystem"
     },
