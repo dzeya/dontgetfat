@@ -5,8 +5,7 @@
       "src": "api/package.json",
       "use": "@vercel/node",
       "config": {
-        "installCommand": "npm install",
-        "buildCommand": "npm run build"
+        "installCommand": "npm install --legacy-peer-deps"
       }
     },
     {
@@ -21,9 +20,6 @@
     {
       "src": "/api/(.*)",
       "dest": "/api/dist/main.js"
-    },
-    {
-      "handle": "filesystem"
     },
     {
       "src": "/(.*)",
