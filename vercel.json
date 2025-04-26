@@ -2,32 +2,33 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/package.json", 
+      "src": "api/package.json",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["dist/**", "node_modules/**"],
-        "buildCommand": "npm install && npm run build"
+        "installCommand": "npm install --legacy-peer-deps",
+        "buildCommand": "npm run build",
+        "includeFiles": ["dist/**"]
       }
     },
     {
       "src": "web/package.json",
-      "use": "@vercel/vite",
-       "config": {
-         "project": "web/tsconfig.json" 
-       }
+      "use": "@vercel/static-build",
+      "config": {
+        "outputDirectory": "dist"
+      }
     }
   ],
   "routes": [
-    { 
+    {
       "src": "/api/(.*)",
       "dest": "/api/dist/main.js"
     },
-    { 
-      "handle": "filesystem" 
+    {
+      "handle": "filesystem"
     },
-    { 
-      "src": "/(.*)", 
+    {
+      "src": "/(.*)",
       "dest": "/index.html"
-    } 
+    }
   ]
 }
