@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { fal } from '@fal-ai/serverless-client'; // Import fal
+import * as falClient from '@fal-ai/serverless-client'; // Import fal client
 
 @Injectable()
 export class ImageGenerationService {
@@ -14,7 +14,7 @@ export class ImageGenerationService {
       // Service remains uninitialized
     } else {
       // Configure the global fal instance with credentials
-      fal.config({
+      falClient.config({
         credentials: apiKey,
       });
       this.isInitialized = true; // Mark as initialized
@@ -32,7 +32,7 @@ export class ImageGenerationService {
 
     try {
       // Use the configured global fal instance
-      const result: any = await fal.subscribe('fal-ai/hidream-i1-fast', {
+      const result: any = await falClient.subscribe('fal-ai/hidream-i1-fast', {
         input: {
           prompt: prompt,
           negative_prompt: 'blurry, low quality, cartoon, drawing, illustration, sketch, unrealistic, text, words, letters, deformed, multiple dishes, hands',

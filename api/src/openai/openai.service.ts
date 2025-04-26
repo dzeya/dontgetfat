@@ -1,14 +1,12 @@
 import { Injectable, InternalServerErrorException, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { HttpService } from '@nestjs/axios';
-import { firstValueFrom, map, catchError } from 'rxjs';
-import { AxiosError } from 'axios';
 import { GenerateMealPlanDto } from './dto/generate-meal-plan.dto'; // Import DTOs
 import { RegenerateMealsDto } from './dto/regenerate-meals.dto';   // Import DTOs
 import { GenerateImageDto } from './dto/generate-image.dto'; // Import DTO
 import { GenerateAllImagesDto } from './dto/generate-all-images.dto'; // Import new DTO
-import * as fal from '@fal-ai/serverless-client';
+import * as falClient from '@fal-ai/serverless-client';
 import { Meal, MealPlan, DayPlan } from '../../../types/meal'; // Import shared types
+import type { AxiosResponse } from 'axios';
 
 @Injectable()
 export class OpenaiService {
@@ -19,7 +17,6 @@ export class OpenaiService {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly httpService: HttpService,
   ) {
     // Fetch API Key securely from environment variables
     this.openAIApiKey = this.configService.get<string>('OPENAI_API_KEY')!;
@@ -57,7 +54,7 @@ Household Size: ${servings}
 Calories per day (approximate total): ${calories || 'not specified'}
 Disliked Ingredients: ${dislikes || 'none'}
 Additional Preferences: ${preferences || 'none'}
-Output ONLY the JSON object conforming to the schema provided in the system message. The JSON structure should represent the requested plan duration (e.g., if preferences ask for 2 days, the JSON should contain exactly 2 day objects).`, // Corrected typo
+Output ONLY the JSON object conforming to the schema provided in the system message. The JSON structure should represent the requested plan duration (e.g., if preferences ask for 2 days, the JSON should contain exactly 2 day objects).`, 
         },
       ],
     };
@@ -65,41 +62,48 @@ Output ONLY the JSON object conforming to the schema provided in the system mess
     this.logger.log('Sending request to OpenAI for meal plan generation...');
 
     try {
-      const response = await firstValueFrom(
-        this.httpService.post<{ choices: [{ message: { content: string } }] }>(this.openAIApiUrl, requestBody, { // Added explicit type for response data
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.openAIApiKey}`,
-          },
-        }).pipe(
-          map(res => {
-            this.logger.log('Received successful response from OpenAI.');
-            const content = res.data.choices?.[0]?.message?.content;
-            if (!content) {
-                this.logger.error('OpenAI response missing content.', res.data);
-                throw new InternalServerErrorException('Failed to parse meal plan: OpenAI response was empty.');
-            }
-            try {
-                // Assuming response_format: json_object works as expected
-                return JSON.parse(content) as MealPlan;
-            } catch (err) {
-                this.logger.error('Failed to parse JSON from OpenAI response:', err, content);
-                throw new InternalServerErrorException(`Failed to parse meal plan. Invalid JSON received: ${content}`);
-            }
-          }),
-          catchError((error: AxiosError) => {
-            this.logger.error(`OpenAI API error: ${error.response?.status}`, error.response?.data || error.message);
-            if (error.response?.status === 401) {
-              throw new UnauthorizedException('Invalid OpenAI API key or access denied.');
-            }
-            throw new InternalServerErrorException(`OpenAI API error: ${error.response?.status || error.message}`);
-          }),
-        ),
-      );
-
-      return response;
-    } catch (error) {
-        // Catch errors thrown from map/catchError or synchronous errors
+      const response = await fetch(this.openAIApiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.openAIApiKey}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
+      
+      if (!response.ok) {
+        const statusCode = response.status;
+        let errorData: any;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          errorData = await response.text();
+        }
+        
+        this.logger.error(`OpenAI API error: ${statusCode}`, errorData);
+        if (statusCode === 401) {
+          throw new UnauthorizedException('Invalid OpenAI API key or access denied.');
+        }
+        throw new InternalServerErrorException(`OpenAI API error: ${statusCode}`);
+      }
+      
+      const responseData = await response.json();
+      const content = responseData.choices?.[0]?.message?.content;
+      
+      if (!content) {
+        this.logger.error('OpenAI response missing content.', responseData);
+        throw new InternalServerErrorException('Failed to parse meal plan: OpenAI response was empty.');
+      }
+      
+      try {
+        // Assuming response_format: json_object works as expected
+        return JSON.parse(content) as MealPlan;
+      } catch (err) {
+        this.logger.error('Failed to parse JSON from OpenAI response:', err, content);
+        throw new InternalServerErrorException(`Failed to parse meal plan. Invalid JSON received: ${content}`);
+      }
+    } catch (error: any) {
+        // Catch errors thrown or synchronous errors
         this.logger.error('Error during OpenAI request execution:', error);
         // Re-throw if it's already a NestJS exception, otherwise wrap it
         if (error.response && error.status) throw error;
@@ -118,9 +122,9 @@ Output ONLY the JSON object conforming to the schema provided in the system mess
     }
 
     try {
-        fal.config({ credentials: this.falKey });
+        falClient.config({ credentials: this.falKey });
 
-        const result: any = await fal.subscribe('fal-ai/fast-sdxl', {
+        const result: any = await falClient.subscribe('fal-ai/fast-sdxl', {
             input: {
                 prompt: `${mealName}, food photography, high detail, delicious looking`,
             },
@@ -149,13 +153,13 @@ Output ONLY the JSON object conforming to the schema provided in the system mess
       throw new InternalServerErrorException('Image generation is not configured.');
     }
 
-    fal.config({ credentials: this.falKey });
+    falClient.config({ credentials: this.falKey });
 
     const imageResults: Record<string, string | null> = {};
     const generationPromises = dto.meals.map(async (meal) => {
       const mealName = meal.name;
       try {
-        const result: any = await fal.subscribe('fal-ai/fast-sdxl', {
+        const result: any = await falClient.subscribe('fal-ai/fast-sdxl', {
           input: {
             prompt: `${mealName}, food photography, high detail, delicious looking`,
           },
@@ -170,7 +174,7 @@ Output ONLY the JSON object conforming to the schema provided in the system mess
           imageResults[mealName] = null; // Mark as failed/not found
         }
       } catch (error) {
-        this.logger.error(`Fal AI error generating image for ${mealName}:`, error?.message || error);
+        this.logger.error(`Fal AI error generating image for ${mealName}:`, error);
         imageResults[mealName] = null; // Mark as failed
       }
     });
@@ -220,49 +224,57 @@ Output ONLY the JSON object. Do NOT include any text before or after the JSON ob
     this.logger.log('Sending request to OpenAI for meal regeneration...');
 
     try {
-        const response = await firstValueFrom(
-            this.httpService.post<{ choices: [{ message: { content: string } }] }>(this.openAIApiUrl, requestBody, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${this.openAIApiKey}`,
-                },
-            }).pipe(
-                map(res => {
-                    this.logger.log('Received successful response from OpenAI (regenerate).');
-                    const content = res.data.choices?.[0]?.message?.content;
-                     if (!content) {
-                        this.logger.error('OpenAI regeneration response missing content.', res.data);
-                        throw new InternalServerErrorException('Failed to parse regenerated meals: OpenAI response was empty.');
-                    }
-                    try {
-                         const parsedObject = JSON.parse(content);
-                         if (parsedObject && Array.isArray(parsedObject.meals)) {
-                            if (parsedObject.meals.length === mealTypesToRegenerate.length) {
-                                return parsedObject.meals as Meal[];
-                            } else {
-                                this.logger.error(`Expected ${mealTypesToRegenerate.length} meals, received ${parsedObject.meals.length}`, parsedObject.meals);
-                                throw new InternalServerErrorException(`AI returned an incorrect number of meals. Expected ${mealTypesToRegenerate.length}, got ${parsedObject.meals.length}`);
-                            }
-                        } else {
-                            this.logger.error('Parsed JSON does not contain a "meals" array:', parsedObject);
-                            throw new InternalServerErrorException('AI response structure was invalid (missing "meals" array).');
-                        }
-                    } catch (err) {
-                        this.logger.error('Failed to parse regeneration JSON:', err, content);
-                        throw new InternalServerErrorException(`Failed to parse regenerated meals. Invalid JSON received: ${content}`);
-                    }
-                }),
-                catchError((error: AxiosError) => {
-                    this.logger.error(`OpenAI API error (regenerate): ${error.response?.status}`, error.response?.data || error.message);
-                     if (error.response?.status === 401) {
-                        throw new UnauthorizedException('Invalid OpenAI API key or access denied.');
-                    }
-                    throw new InternalServerErrorException(`OpenAI API error during regeneration: ${error.response?.status || error.message}`);
-                }),
-            ),
-        );
-        return response;
-    } catch (error) {
+        const response = await fetch(this.openAIApiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${this.openAIApiKey}`,
+            },
+            body: JSON.stringify(requestBody),
+        });
+
+        if (!response.ok) {
+            const statusCode = response.status;
+            let errorData: any;
+            try {
+                errorData = await response.json();
+            } catch (e) {
+                errorData = await response.text();
+            }
+            
+            this.logger.error(`OpenAI API error (regenerate): ${statusCode}`, errorData);
+            if (statusCode === 401) {
+                throw new UnauthorizedException('Invalid OpenAI API key or access denied.');
+            }
+            throw new InternalServerErrorException(`OpenAI API error during regeneration: ${statusCode}`);
+        }
+
+        const responseData = await response.json();
+        const content = responseData.choices?.[0]?.message?.content;
+
+        if (!content) {
+            this.logger.error('OpenAI regeneration response missing content.', responseData);
+            throw new InternalServerErrorException('Failed to parse regenerated meals: OpenAI response was empty.');
+        }
+
+        try {
+            const parsedObject = JSON.parse(content);
+            if (parsedObject && Array.isArray(parsedObject.meals)) {
+                if (parsedObject.meals.length === mealTypesToRegenerate.length) {
+                    return parsedObject.meals as Meal[];
+                } else {
+                    this.logger.error(`Expected ${mealTypesToRegenerate.length} meals, received ${parsedObject.meals.length}`, parsedObject.meals);
+                    throw new InternalServerErrorException(`AI returned an incorrect number of meals. Expected ${mealTypesToRegenerate.length}, got ${parsedObject.meals.length}`);
+                }
+            } else {
+                this.logger.error('Parsed JSON does not contain a "meals" array:', parsedObject);
+                throw new InternalServerErrorException('AI response structure was invalid (missing "meals" array).');
+            }
+        } catch (err) {
+            this.logger.error('Failed to parse regeneration JSON:', err, content);
+            throw new InternalServerErrorException(`Failed to parse regenerated meals. Invalid JSON received: ${content}`);
+        }
+    } catch (error: any) {
         this.logger.error('Error during OpenAI regeneration request execution:', error);
         if (error.response && error.status) throw error;
         throw new InternalServerErrorException('An unexpected error occurred while regenerating meals.');
