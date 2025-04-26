@@ -4,7 +4,7 @@ import React, { createContext, useState, useContext, ReactNode, useEffect } from
 import { generateMealPlan, Meal, MealPlan, regenerateMealsService } from './services/openai'; 
 // Placeholder for the new service function - we will create this next
 // import { regenerateMealsService } from './services/openai'; 
-import { Preferences, GroceryItem } from './types'; 
+import { GroceryItem } from './types'; 
 import { useAuth } from './context/AuthContext'; 
 
 const aisleMapping: { [key: string]: string } = {
@@ -51,6 +51,14 @@ interface MealPlanProviderProps {
 const PREFERENCES_KEY = 'dontGetFat_preferences';
 const MEAL_PLAN_KEY = 'dontGetFat_mealPlan';
 const GROCERY_LIST_KEY = 'dontGetFat_groceryList';
+
+export interface Preferences {
+  diet: string;
+  servings: number;
+  calories: string;
+  dislikes: string;
+  preferences: string;
+}
 
 export const MealPlanProvider: React.FC<MealPlanProviderProps> = ({ children }) => {
   const { profile } = useAuth(); 
@@ -216,7 +224,10 @@ export const MealPlanProvider: React.FC<MealPlanProviderProps> = ({ children }) 
 
         // === Call the actual service function ===
         const newMeals: Meal[] = await regenerateMealsService(
-            preferences,
+            {
+              ...preferences,
+              calories: preferences.calories === "" ? undefined : preferences.calories
+            },
             mealTypesToRegenerate,
             previousMealNames 
         ); 
@@ -298,13 +309,10 @@ export const MealPlanProvider: React.FC<MealPlanProviderProps> = ({ children }) 
 
     try {
       console.log("Calling OpenAI with preferences:", prefsToSave);
-      const plan = await generateMealPlan(
-        prefsToSave.diet,
-        prefsToSave.servings,
-        prefsToSave.calories, // Note: Profile doesn't have calories, passing empty string
-        prefsToSave.dislikes,
-        prefsToSave.preferences
-      );
+      const plan = await generateMealPlan({
+        ...prefsToSave,
+        calories: prefsToSave.calories === "" ? undefined : prefsToSave.calories
+      });
       setMealPlanHandler(plan); // Sets local state & triggers grocery list generation
       console.log("Meal plan generated:", plan);
     } catch (err: any) {
