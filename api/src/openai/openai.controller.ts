@@ -2,6 +2,7 @@ import { Controller, Post, Body, UsePipes, ValidationPipe } from '@nestjs/common
 import { OpenaiService } from './openai.service';
 import { GenerateMealPlanDto } from './dto/generate-meal-plan.dto';
 import { RegenerateMealsDto } from './dto/regenerate-meals.dto';
+import { GenerateImageDto } from './dto/generate-image.dto';
 
 @Controller('openai') // Defines the base route for this controller (/api/openai)
 export class OpenaiController {
@@ -21,5 +22,12 @@ export class OpenaiController {
         return this.openaiService.regenerateMealsService(
             regenerateMealsDto // Pass the whole DTO as the service expects it
         );
+    }
+
+    @Post('generate-image') // Route: POST /api/openai/generate-image
+    @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+    async generateImage(@Body() generateImageDto: GenerateImageDto) {
+        // Call the service method with the validated DTO
+        return this.openaiService.generateMealImage(generateImageDto);
     }
 }

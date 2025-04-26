@@ -1,11 +1,8 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
-// Import Meal and MealPlan from the service file
-// Also import the new regeneration service function
-import { generateMealPlan, Meal, MealPlan, regenerateMealsService } from './services/openai'; 
-// Placeholder for the new service function - we will create this next
-// import { regenerateMealsService } from './services/openai'; 
-import { GroceryItem } from './types'; 
-import { useAuth } from './context/AuthContext'; 
+import { generateMealPlan as generateMealPlanAPI, regenerateMealsService } from './services/openai';
+import { useAuth } from './context/AuthContext';
+import { Meal, MealPlan } from '../../types/meal';
+import { GroceryItem } from './types';
 
 const aisleMapping: { [key: string]: string } = {
   'lettuce': 'Produce', 'banana': 'Produce', 'onion': 'Produce', 'garlic': 'Produce', 'celery': 'Produce', 'apple': 'Produce', 'orange': 'Produce', 'spinach': 'Produce', 'tomato': 'Produce', 'potato': 'Produce', 'carrot': 'Produce', 'broccoli': 'Produce',
@@ -226,7 +223,7 @@ export const MealPlanProvider: React.FC<MealPlanProviderProps> = ({ children }) 
         const newMeals: Meal[] = await regenerateMealsService(
             {
               ...preferences,
-              calories: preferences.calories === "" ? undefined : preferences.calories
+              calories: preferences.calories === "" ? undefined : Number(preferences.calories)
             },
             mealTypesToRegenerate,
             previousMealNames 
@@ -309,15 +306,22 @@ export const MealPlanProvider: React.FC<MealPlanProviderProps> = ({ children }) 
 
     try {
       console.log("Calling OpenAI with preferences:", prefsToSave);
-      const plan = await generateMealPlan({
-        ...prefsToSave,
-        calories: prefsToSave.calories === "" ? undefined : prefsToSave.calories
-      });
+      // Convert servings and calories *before* calling the API
+      const servingsNum = Number(prefsToSave.servings);
+      const caloriesNum = prefsToSave.calories === "" ? undefined : Number(prefsToSave.calories);
+
+      const plan = await generateMealPlanAPI(
+        prefsToSave.diet,
+        servingsNum,       // Pass converted number
+        caloriesNum,       // Pass converted number or undefined
+        prefsToSave.dislikes,
+        prefsToSave.preferences
+      );
       setMealPlanHandler(plan); // Sets local state & triggers grocery list generation
       console.log("Meal plan generated:", plan);
-    } catch (err: any) {
-      console.error("Error generating meal plan:", err);
-      setError(err.message || 'Failed to generate meal plan');
+    } catch (error: any) {
+      console.error('Failed to load or generate meal plan:', error);
+      setError(`Error loading or generating meal plan: ${error.message}`);
     } finally {
       setIsLoading(false);
     }

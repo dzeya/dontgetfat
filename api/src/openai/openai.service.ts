@@ -5,29 +5,16 @@ import { firstValueFrom, map, catchError } from 'rxjs';
 import { AxiosError } from 'axios';
 import { GenerateMealPlanDto } from './dto/generate-meal-plan.dto'; // Import DTOs
 import { RegenerateMealsDto } from './dto/regenerate-meals.dto';   // Import DTOs
-
-// --- Interfaces (copied from frontend for now) ---
-export interface Meal {
-  type: string;
-  name: string;
-  ingredients: string[];
-  estimated_time: number; // in minutes
-}
-
-export interface DayPlan {
-  day: number; // e.g., 1 for Monday
-  meals: Meal[];
-}
-
-export interface MealPlan {
-  days: DayPlan[];
-}
+import { GenerateImageDto } from './dto/generate-image.dto'; // Import DTO
+import * as fal from '@fal-ai/serverless-client';
+import { Meal, MealPlan, DayPlan } from '../../../types/meal'; // Import shared types
 
 @Injectable()
 export class OpenaiService {
   private readonly logger = new Logger(OpenaiService.name);
   private readonly openAIApiUrl = 'https://api.openai.com/v1/chat/completions';
   private readonly openAIApiKey: string;
+  private readonly falKey: string;
 
   constructor(
     private readonly configService: ConfigService,
@@ -38,6 +25,12 @@ export class OpenaiService {
     if (!this.openAIApiKey) {
       this.logger.error('OPENAI_API_KEY not found in environment variables.');
       throw new Error('Server configuration error: OpenAI API Key is missing.');
+    }
+    // Fetch Fal AI Key
+    this.falKey = this.configService.get<string>('FAL_KEY')!;
+    if (!this.falKey) {
+      this.logger.warn('FAL_KEY not found in environment variables. Image generation will be skipped.');
+      // Don't throw an error, allow the service to function without image generation
     }
   }
 
@@ -102,6 +95,7 @@ Output ONLY the JSON object conforming to the schema provided in the system mess
           }),
         ),
       );
+
       return response;
     } catch (error) {
         // Catch errors thrown from map/catchError or synchronous errors
@@ -109,6 +103,39 @@ Output ONLY the JSON object conforming to the schema provided in the system mess
         // Re-throw if it's already a NestJS exception, otherwise wrap it
         if (error.response && error.status) throw error;
         throw new InternalServerErrorException('An unexpected error occurred while generating the meal plan.');
+    }
+  }
+
+  // --- New method for On-Demand Image Generation ---
+  async generateMealImage(dto: GenerateImageDto): Promise<{ imageUrl: string | null }> {
+    const { mealName } = dto;
+    this.logger.log(`Generating image for meal: ${mealName}...`);
+
+    if (!this.falKey) {
+      this.logger.warn('Fal AI key missing, cannot generate image.');
+      throw new InternalServerErrorException('Image generation is not configured.');
+    }
+
+    try {
+        fal.config({ credentials: this.falKey });
+
+        const result: any = await fal.subscribe('fal-ai/fast-sdxl', {
+            input: {
+                prompt: `${mealName}, food photography, high detail, delicious looking`,
+            },
+            logs: false,
+        });
+
+        if (result?.images?.[0]?.url) {
+            this.logger.log(`Generated image for ${mealName}: ${result.images[0].url}`);
+            return { imageUrl: result.images[0].url };
+        } else {
+            this.logger.warn(`Fal AI response missing URL for ${mealName}.`, result);
+            throw new InternalServerErrorException('Failed to get image URL from generation service.');
+        }
+    } catch (error) {
+        this.logger.error(`Fal AI error generating image for ${mealName}:`, error);
+        throw new InternalServerErrorException(`Failed to generate image for ${mealName}.`);
     }
   }
 

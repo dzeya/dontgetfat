@@ -142,3 +142,44 @@ export const regenerateMealsService = async (
         throw new Error('Failed to parse regenerated meals data from backend.');
     }
 };
+
+// --- New function to call the image generation endpoint ---
+export async function generateMealImageAPI(mealName: string): Promise<{ imageUrl: string | null }> {
+  console.log(`Requesting image generation for: ${mealName}`);
+  const res = await fetch(`${API_BASE_URL}/openai/generate-image`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ mealName: mealName })
+  });
+
+  if (!res.ok) {
+    let errorMsg = `HTTP error! status: ${res.status}`;
+    try {
+      const errorBody = await res.json();
+      errorMsg = `${errorMsg} - ${errorBody.message || JSON.stringify(errorBody)}`;
+    } catch (e) {
+      // Ignore if response body is not JSON
+    }
+    console.error('Error generating meal image:', errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  try {
+    const data = await res.json();
+    console.log(`Received image data for ${mealName}:`, data);
+    if (data && typeof data.imageUrl === 'string') {
+        return { imageUrl: data.imageUrl };
+    } else if (data && data.imageUrl === null) {
+        return { imageUrl: null }; // Explicitly handle null case if API returns it
+    } else {
+        // Handle unexpected response structure
+        console.warn('Unexpected image generation response structure:', data);
+        throw new Error('Invalid image data received from backend.');
+    }
+  } catch (error) {
+    console.error('Error parsing image generation JSON:', error);
+    throw new Error('Failed to parse image data from backend.');
+  }
+}
