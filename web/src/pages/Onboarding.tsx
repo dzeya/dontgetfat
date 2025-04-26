@@ -58,7 +58,7 @@ const Onboarding: React.FC = () => {
       const currentPrefsPayload: Preferences = {
         diet,
         servings: Number(servings),
-        calories: calories, // Pass the state value directly (it's already number | '')
+        calories: String(calories), // Convert number | '' to string
         dislikes,
         preferences: generalPreferences // Use renamed state variable
       };
@@ -67,7 +67,8 @@ const Onboarding: React.FC = () => {
       const plan = await generateMealPlan(
         currentPrefsPayload.diet,
         currentPrefsPayload.servings,
-        currentPrefsPayload.calories,
+        // Convert string back to number | undefined for API call
+        currentPrefsPayload.calories === '' ? undefined : Number(currentPrefsPayload.calories),
         currentPrefsPayload.dislikes,
         currentPrefsPayload.preferences
       );

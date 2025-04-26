@@ -3,6 +3,7 @@ import { OpenaiService } from './openai.service';
 import { GenerateMealPlanDto } from './dto/generate-meal-plan.dto';
 import { RegenerateMealsDto } from './dto/regenerate-meals.dto';
 import { GenerateImageDto } from './dto/generate-image.dto';
+import { GenerateAllImagesDto } from './dto/generate-all-images.dto';
 
 @Controller('openai') // Defines the base route for this controller (/api/openai)
 export class OpenaiController {
@@ -29,5 +30,12 @@ export class OpenaiController {
     async generateImage(@Body() generateImageDto: GenerateImageDto) {
         // Call the service method with the validated DTO
         return this.openaiService.generateMealImage(generateImageDto);
+    }
+
+    @Post('generate-all-images') // Route: POST /api/openai/generate-all-images
+    @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+    async generateAllImages(@Body() generateAllImagesDto: GenerateAllImagesDto) {
+        // Call the service method with the validated DTO
+        return this.openaiService.generateAllMealImages(generateAllImagesDto);
     }
 }

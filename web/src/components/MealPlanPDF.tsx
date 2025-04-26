@@ -1,6 +1,6 @@
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet } from '@react-pdf/renderer';
-import { MealPlan } from '../services/openai'; // Assuming MealPlan type is here
+import { MealPlan } from '../../../types/meal'; // Corrected path to shared type
 
 // Register a font (optional, but good for consistency/style)
 // Using a standard font like Helvetica for broad compatibility
@@ -86,7 +86,7 @@ const MealPlanPDF: React.FC<MealPlanPDFProps> = ({ mealPlan }) => (
 
       {mealPlan.days.map((day, dayIndex) => (
         <View key={dayIndex} style={styles.daySection}>
-          <Text style={styles.dayHeader}>Day {day.day}: {day.theme || ''}</Text>
+          <Text style={styles.dayHeader}>Day {day.day}</Text>
           {day.meals.map((meal, mealIndex) => (
             <View key={mealIndex} style={styles.mealSection}>
               <Text style={styles.mealTitle}>{meal.name}</Text>

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useMealPlan } from '../MealPlanContext'
 import {
   Box,
@@ -21,6 +21,9 @@ import { useTheme } from '@mui/material/styles'; // Import useTheme
 
 import { PDFDownloadLink } from '@react-pdf/renderer'; // Import PDFDownloadLink
 import MealPlanPDF from '../components/MealPlanPDF'; // Import the PDF document component
+
+// Import the API function
+import { generateAllMealImagesAPI } from '../services/openai'; // Import bulk generation function
 
 // Define Props for Planner component
 interface PlannerProps {
@@ -53,6 +56,11 @@ const Planner: React.FC<PlannerProps> = () => {
   } = useMealPlan()
   const [selectedMeals, setSelectedMeals] = React.useState<Set<string>>(new Set());
 
+  // State for bulk image generation
+  const [allMealImages, setAllMealImages] = useState<Record<string, string | null>>({});
+  const [isGeneratingAllImages, setIsGeneratingAllImages] = useState<boolean>(false);
+  const [generateAllError, setGenerateAllError] = useState<string | null>(null);
+
   const handleCheckboxChange = (dayIndex: number, mealIndex: number) => {
     const mealKey = `${dayIndex}-${mealIndex}`;
     setSelectedMeals(prevSelected => {
@@ -73,6 +81,46 @@ const Planner: React.FC<PlannerProps> = () => {
     await regenerateSelectedMeals(Array.from(selectedMeals));
     // Optionally clear selection after regeneration
     // setSelectedMeals(new Set()); 
+  };
+
+  // --- Handler for generating all meal images ---
+  const handleGenerateAllImages = async () => {
+    if (!mealPlan) return;
+
+    console.log('Starting generation for all meal images...');
+    setIsGeneratingAllImages(true);
+    setGenerateAllError(null);
+    setAllMealImages({}); // Clear previous images
+
+    // Collect unique meal names
+    const mealNames = new Set<string>();
+    mealPlan.days.forEach(day => {
+      day.meals.forEach(meal => {
+        if (meal && meal.name) {
+          mealNames.add(meal.name);
+        }
+      });
+    });
+
+    const mealsToGenerate = Array.from(mealNames).map(name => ({ name }));
+
+    if (mealsToGenerate.length === 0) {
+      console.log('No meal names found to generate images for.');
+      setIsGeneratingAllImages(false);
+      return;
+    }
+
+    try {
+      const results = await generateAllMealImagesAPI(mealsToGenerate);
+      setAllMealImages(results);
+      console.log('Bulk image generation successful:', results);
+    } catch (error: any) {
+      console.error('Error generating all images:', error);
+      setGenerateAllError(error?.message || 'Failed to generate images.');
+    } finally {
+      setIsGeneratingAllImages(false);
+      console.log('Finished bulk image generation attempt.');
+    }
   };
 
   // Loading state
@@ -172,6 +220,16 @@ const Planner: React.FC<PlannerProps> = () => {
         >
           {isRegenerating ? 'Regenerating...' : `Regenerate Selected (${selectedMeals.size})`}
         </Button>
+        {/* Generate All Images Button */}
+        <Button
+          variant="contained"
+          color="secondary"
+          onClick={handleGenerateAllImages}
+          disabled={isGeneratingAllImages || !mealPlan || contextIsLoading}
+          startIcon={isGeneratingAllImages ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}
+        >
+          {isGeneratingAllImages ? 'Generating...' : `Generate All Images`}
+        </Button>
       </Box>
 
       {/* Display Regeneration Error */} 
@@ -179,6 +237,14 @@ const Planner: React.FC<PlannerProps> = () => {
         <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
           <Alert severity="error" sx={{ width: 'fit-content' }}>
             Regeneration failed: {regenerateError}
+          </Alert>
+        </Box>
+      )}
+      {/* Display Bulk Image Generation Error */}
+      {generateAllError && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+          <Alert severity="error" sx={{ width: 'fit-content' }}>
+            Image generation failed: {generateAllError}
           </Alert>
         </Box>
       )}
@@ -208,9 +274,7 @@ const Planner: React.FC<PlannerProps> = () => {
                   if (!meal) return null; // Skip if meal is undefined
                   
                   const { name, type, ingredients } = meal;
-                  
-                  const randomImageUrl = `https://source.unsplash.com/random/300x200?food,${name.split(' ')[0]}`;
-                  
+
                   // ** Updated Ingredient Display Logic: Show all ingredients, allow wrapping **
                   const ingredientsArray = Array.isArray(ingredients) ? ingredients : 
                     (typeof ingredients === 'string' ? [ingredients] : []);
@@ -293,7 +357,7 @@ const Planner: React.FC<PlannerProps> = () => {
                           />
 
                           <img 
-                            src={randomImageUrl} 
+                            src={allMealImages[name || ''] || `https://source.unsplash.com/random/300x200?food,${name ? name.split(' ')[0] : 'plate'}`} 
                             alt={meal.name || 'Meal image'} 
                             style={{ 
                               position: 'absolute',
@@ -301,7 +365,7 @@ const Planner: React.FC<PlannerProps> = () => {
                               left: 0,
                               width: '100%',
                               height: '100%',
-                              objectFit: 'cover',
+                              objectFit: 'cover', 
                             }}
                             loading="lazy" 
                           />
@@ -392,16 +456,16 @@ const Planner: React.FC<PlannerProps> = () => {
                             pt: 1,
                             position: 'absolute',
                             bottom: 16,
-                            right: 16
+                            right: 16,
                           }}>
-                            {/* Replace custom checkbox with MUI Checkbox */}
-                            <Checkbox 
-                              color="primary"
-                              checked={selectedMeals.has(`${dayIndex}-${mealIndex}`)} // Set checked state
-                              onChange={() => handleCheckboxChange(dayIndex, mealIndex)} // Set onChange handler
-                              aria-label={`Select ${name}`}
-                              // Add state management here if needed later
-                            />
+                             {/* Replace custom checkbox with MUI Checkbox */}
+                             <Checkbox 
+                                color="primary"
+                                checked={selectedMeals.has(`${dayIndex}-${mealIndex}`)} // Set checked state
+                                onChange={() => handleCheckboxChange(dayIndex, mealIndex)} // Set onChange handler
+                                aria-label={`Select ${name}`}
+                                // Add state management here if needed later
+                             />
                           </Box>
                         </Box>
                       </Card>

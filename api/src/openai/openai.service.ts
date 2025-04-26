@@ -6,6 +6,7 @@ import { AxiosError } from 'axios';
 import { GenerateMealPlanDto } from './dto/generate-meal-plan.dto'; // Import DTOs
 import { RegenerateMealsDto } from './dto/regenerate-meals.dto';   // Import DTOs
 import { GenerateImageDto } from './dto/generate-image.dto'; // Import DTO
+import { GenerateAllImagesDto } from './dto/generate-all-images.dto'; // Import new DTO
 import * as fal from '@fal-ai/serverless-client';
 import { Meal, MealPlan, DayPlan } from '../../../types/meal'; // Import shared types
 
@@ -137,6 +138,48 @@ Output ONLY the JSON object conforming to the schema provided in the system mess
         this.logger.error(`Fal AI error generating image for ${mealName}:`, error);
         throw new InternalServerErrorException(`Failed to generate image for ${mealName}.`);
     }
+  }
+
+  // --- New method for Bulk On-Demand Image Generation ---
+  async generateAllMealImages(dto: GenerateAllImagesDto): Promise<Record<string, string | null>> {
+    this.logger.log(`Generating images for ${dto.meals.length} meals...`);
+
+    if (!this.falKey) {
+      this.logger.warn('Fal AI key missing, cannot generate images.');
+      throw new InternalServerErrorException('Image generation is not configured.');
+    }
+
+    fal.config({ credentials: this.falKey });
+
+    const imageResults: Record<string, string | null> = {};
+    const generationPromises = dto.meals.map(async (meal) => {
+      const mealName = meal.name;
+      try {
+        const result: any = await fal.subscribe('fal-ai/fast-sdxl', {
+          input: {
+            prompt: `${mealName}, food photography, high detail, delicious looking`,
+          },
+          logs: false,
+        });
+
+        if (result?.images?.[0]?.url) {
+          this.logger.log(`Generated image for ${mealName}`);
+          imageResults[mealName] = result.images[0].url;
+        } else {
+          this.logger.warn(`Fal AI response missing URL for ${mealName}.`);
+          imageResults[mealName] = null; // Mark as failed/not found
+        }
+      } catch (error) {
+        this.logger.error(`Fal AI error generating image for ${mealName}:`, error?.message || error);
+        imageResults[mealName] = null; // Mark as failed
+      }
+    });
+
+    // Wait for all image generation attempts to complete
+    await Promise.all(generationPromises);
+
+    this.logger.log('Finished generating all meal images.');
+    return imageResults;
   }
 
   // Use the DTO for the parameter type

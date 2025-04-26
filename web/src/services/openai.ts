@@ -1,23 +1,7 @@
 // --- Interfaces (consider moving to a shared types folder) ---
-export interface Meal {
-  type: 'breakfast' | 'lunch' | 'dinner' | 'snack'; // More specific type
-  name: string;
-  ingredients: string[];
-  estimated_time: number; // in minutes
-}
+import { Meal, MealPlan } from '../../../types/meal'; // Import from shared types
 
-export interface DayPlan {
-  day: number; // e.g., 1 for Monday
-  meals: Meal[];
-}
-
-export interface MealPlan {
-  days: DayPlan[];
-}
 // --- End Interfaces ---
-
-// Determine API base URL based on environment
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 /**
  * Generates a meal plan by calling the backend service.
@@ -44,7 +28,7 @@ export async function generateMealPlan(
     requestBody.calories = calories;
   }
 
-  const res = await fetch(`${API_BASE_URL}/openai/generate-plan`, {
+  const res = await fetch(`/api/openai/generate-plan`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -85,7 +69,7 @@ export const regenerateMealsService = async (
     preferences: {
         diet: string;
         servings: number;
-        calories?: number;
+        calories?: number; // Keep API parameter types as they are
         dislikes?: string;
         preferences?: string;
     },
@@ -96,7 +80,7 @@ export const regenerateMealsService = async (
     console.log('With preferences:', preferences);
     console.log('Avoiding previous:', previousMealNames);
 
-    const res = await fetch(`${API_BASE_URL}/openai/regenerate-meals`, {
+    const res = await fetch(`/api/openai/regenerate-meals`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -146,7 +130,7 @@ export const regenerateMealsService = async (
 // --- New function to call the image generation endpoint ---
 export async function generateMealImageAPI(mealName: string): Promise<{ imageUrl: string | null }> {
   console.log(`Requesting image generation for: ${mealName}`);
-  const res = await fetch(`${API_BASE_URL}/openai/generate-image`, {
+  const res = await fetch(`/api/image-generation/generate`, { 
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -181,5 +165,44 @@ export async function generateMealImageAPI(mealName: string): Promise<{ imageUrl
   } catch (error) {
     console.error('Error parsing image generation JSON:', error);
     throw new Error('Failed to parse image data from backend.');
+  }
+}
+
+// --- New function to call the BULK image generation endpoint ---
+export async function generateAllMealImagesAPI(meals: { name: string }[]): Promise<Record<string, string | null>> {
+  console.log(`Requesting bulk image generation for ${meals.length} meals...`);
+  const res = await fetch(`/api/image-generation/generate-all`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ meals: meals })
+  });
+
+  if (!res.ok) {
+    let errorMsg = `HTTP error! status: ${res.status}`;
+    try {
+      const errorBody = await res.json();
+      errorMsg = `${errorMsg} - ${errorBody.message || JSON.stringify(errorBody)}`;
+    } catch (e) {
+      // Ignore if response body is not JSON
+    }
+    console.error('Error generating all meal images:', errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  try {
+    const data = await res.json();
+    console.log(`Received all image data:`, data);
+    // Assuming the backend returns Record<string, string | null>
+    if (data && typeof data === 'object') {
+      return data;
+    } else {
+      console.warn('Unexpected bulk image generation response structure:', data);
+      throw new Error('Invalid image data received from backend.');
+    }
+  } catch (error) {
+    console.error('Error parsing bulk image generation JSON:', error);
+    throw new Error('Failed to parse bulk image data from backend.');
   }
 }

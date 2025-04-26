@@ -15,10 +15,9 @@ async function bootstrap() {
   // Enable CORS for frontend (adjust origin as needed for production)
   const allowedOrigins = [
     'http://localhost:5173', // Vite default dev port
-    /^http:\/\/127\.0\.0\.1:\d+$/, // Browser preview proxy (127.0.0.1:any_port)
-    /^https:\/\/[a-zA-Z0-9\-]+(\-[a-zA-Z0-9]+)*\.vercel\.app$/, // Vercel deployments (incl. previews)
-    // Add your production custom domain here if you have one, e.g.:
-    // 'https://your-production-domain.com'
+    /^http:\/\/localhost:\d+$/, // Allow any localhost port
+    /^http:\/\/127\.0\.0\.1:\d+$/, // Browser preview proxy
+    /^https:\/\/[a-zA-Z0-9-]+(-[a-zA-Z0-9]+)*\.vercel\.app$/, // Standard Vercel previews/deployments
   ];
 
   app.enableCors({

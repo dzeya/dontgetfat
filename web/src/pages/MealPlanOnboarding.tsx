@@ -58,7 +58,7 @@ const MealPlanOnboarding: React.FC<MealPlanOnboardingProps> = ({
   cuisineOptions
 }) => { 
   const navigate = useNavigate();
-  const { user, profile, loading: authLoading, fetchProfile } = useAuth(); // Get user, profile, loading state
+  const { user, profile, loading: authLoading } = useAuth(); // Get user, profile, loading state
   const { generateAndSetMealPlan, isLoading: isGenerating, error: generationError } = useMealPlan(); 
   const [activeStep, setActiveStep] = React.useState(0);
   const [isSaving, setIsSaving] = useState(false); // Loading state for saving profile

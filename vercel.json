@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/package.json", 
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["dist/**", "node_modules/**"],
+        "buildCommand": "npm install && npm run build"
+      }
+    },
+    {
+      "src": "web/package.json",
+      "use": "@vercel/vite",
+       "config": {
+         "project": "web/tsconfig.json" 
+       }
+    }
+  ],
+  "routes": [
+    { 
+      "src": "/api/(.*)",
+      "dest": "/api/main.js"
+    },
+    { 
+      "handle": "filesystem" 
+    },
+    { 
+      "src": "/(.*)", 
+      "dest": "/index.html"
+    } 
+  ]
+}

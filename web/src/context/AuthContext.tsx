@@ -1,25 +1,38 @@
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
-import { FormData } from '../types'; // Import FormData for profile type
 
-// Define Profile type based on table structure (can reuse FormData for now)
+// Define Profile type based on table structure
 // Ensure this matches the columns in your 'profiles' table
-type Profile = FormData & {
-  id: string; // uuid
-  updated_at?: string; // timestamptz
+interface Profile {
+  id: string;
+  updated_at?: string;
   username?: string;
   full_name?: string;
   avatar_url?: string;
   website?: string;
-};
+  // Fields from FormData
+  goals?: string[];
+  otherGoals?: string;
+  allergies?: string[];
+  specificAllergies?: string;
+  dietaryChoice?: string;
+  dislikes?: string;
+  cookingTime?: string;
+  batchCooking?: boolean;
+  householdSize?: string;
+  mealsPerDay?: string; // Add if needed based on your table
+  cookingDaysPerWeek?: string; // Add if needed based on your table
+  favoriteCuisines?: string[];
+  favoriteMeals?: string;
+}
 
 interface AuthContextType {
   session: Session | null;
   user: User | null;
-  profile: Profile | null; // Add profile state
-  loading: boolean; // Represents initial auth check + profile fetch
-  fetchProfile: () => Promise<void>; // Add function to manually refetch profile if needed
+  profile: Profile | null; // Use updated Profile type
+  loading: boolean;
+  fetchProfile: () => Promise<void>; // Add fetchProfile to context type
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,12 +55,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const { data, error, status } = await supabase
         .from('profiles')
-        .select(`*
-          // Explicitly list columns matching FormData + others if needed
-          // goals, other_goals, allergies, specific_allergies, dietary_choice, 
-          // dislikes, cooking_time, batch_cooking, household_size, 
-          // favorite_cuisines, favorite_meals,
-          // username, full_name, website, avatar_url 
+        .select(`
+          id,
+          updated_at,
+          username,
+          full_name,
+          avatar_url,
+          website,
+          goals,
+          otherGoals,
+          allergies,
+          specificAllergies,
+          dietaryChoice,
+          dislikes,
+          cookingTime,
+          batchCooking,
+          householdSize,
+          mealsPerDay,
+          cookingDaysPerWeek,
+          favoriteCuisines,
+          favoriteMeals
         `)
         .eq('id', user.id)
         .single();
@@ -75,6 +102,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           cookingTime: data.cookingTime || '🍳 Standard (15-30 mins)',
           batchCooking: data.batchCooking || false,
           householdSize: data.householdSize || 'Just Me (1)',
+          mealsPerDay: data.mealsPerDay, // Map new fields
+          cookingDaysPerWeek: data.cookingDaysPerWeek, // Map new fields
           favoriteCuisines: data.favoriteCuisines || [],
           favoriteMeals: data.favoriteMeals || '',
         });
@@ -90,110 +119,60 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Fetch session and profile on initial load and auth state changes
   useEffect(() => {
-    const setupAuth = async () => {
-      setLoading(true);
-      // 1. Get initial session
-      const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        console.error('Error fetching initial session:', sessionError);
-      } else {
-        setSession(initialSession);
-        const initialUser = initialSession?.user ?? null;
-        setUser(initialUser);
-        // 2. Fetch profile if user exists
-        if (initialUser) {
-           await fetchProfileBasedOnUser(initialUser.id);
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        console.log('Auth state changed:', _event, session);
+        setSession(session);
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+
+        if (currentUser) {
+          // If user logs in, fetch their profile
+          fetchProfile(); 
+        } else {
+          // If user logs out, clear the profile
+          setProfile(null);
+        }
+
+        // Initial loading complete after first auth check
+        if (loading) {
+          setLoading(false);
         }
       }
-       setLoading(false); // Initial auth check complete
-    };
+    );
 
-    setupAuth();
-
-    // Listener for auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-       console.log("Auth state changed:", _event, session);
-      const currentUser = session?.user ?? null;
+    // Initial check to see if there's an existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session fetch:', session);
       setSession(session);
+      const currentUser = session?.user ?? null;
       setUser(currentUser);
-      // Fetch profile when user logs in or session changes
       if (currentUser) {
-         await fetchProfileBasedOnUser(currentUser.id);
+         // Fetch profile immediately if session exists on load
+         fetchProfile();
       } else {
-        setProfile(null); // Clear profile on logout
-        setLoading(false); // No profile to load
+        setLoading(false); // No user, loading is done
       }
     });
 
-    // Cleanup listener
+    // Cleanup listener on component unmount
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, []); // Run only once on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Removed user and fetchProfile dependency, handled internally
 
-  // Helper to fetch profile based on user ID, managing loading state
-  const fetchProfileBasedOnUser = async (userId: string) => {
-     setLoading(true);
-    console.log('Fetching profile for user:', userId);
-    try {
-       const { data, error, status } = await supabase
-        .from('profiles')
-        .select(`*
-          // goals, other_goals, allergies, specific_allergies, dietary_choice, 
-          // dislikes, cooking_time, batch_cooking, household_size, 
-          // favorite_cuisines, favorite_meals,
-          // username, full_name, website, avatar_url 
-        `)
-        .eq('id', userId)
-        .single();
-
-      if (error && status !== 406) throw error;
-
-      if (data) {
-        console.log('Profile data found:', data);
-         setProfile({
-          id: data.id,
-          updated_at: data.updated_at,
-          username: data.username,
-          full_name: data.full_name,
-          avatar_url: data.avatar_url,
-          website: data.website,
-          goals: data.goals || [],
-          otherGoals: data.otherGoals || '',
-          allergies: data.allergies || [],
-          specificAllergies: data.specificAllergies || '',
-          dietaryChoice: data.dietaryChoice || 'None/No specific diet',
-          dislikes: data.dislikes || '',
-          cookingTime: data.cookingTime || '🍳 Standard (15-30 mins)',
-          batchCooking: data.batchCooking || false,
-          householdSize: data.householdSize || 'Just Me (1)',
-          favoriteCuisines: data.favoriteCuisines || [],
-          favoriteMeals: data.favoriteMeals || '',
-        });
-      } else {
-        console.log('No profile data found for user.');
-        setProfile(null);
-      }
-    } catch (error: any) {
-      console.error('Error fetching profile:', error.message);
-      setProfile(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
+  // Context value
   const value = {
     session,
     user,
-    profile, // Provide profile in context
+    profile,
     loading,
-    fetchProfile: () => fetchProfileBasedOnUser(user!.id) // Provide fetch function (ensure user exists)
+    fetchProfile, // Provide fetchProfile through context
   };
 
-  // Render children only when initial loading (session check) is complete
-  // Specific components can handle the profile loading state internally if needed
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 

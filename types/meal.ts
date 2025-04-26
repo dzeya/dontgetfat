@@ -1,7 +1,7 @@
 // Shared type definitions for Meal Planning
 
 export interface Meal {
-  type: string;
+  type: 'breakfast' | 'lunch' | 'dinner' | 'snack'; // More specific type
   name: string;
   ingredients: string[];
   estimated_time: number; // in minutes
