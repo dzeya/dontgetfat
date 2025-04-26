@@ -2,32 +2,32 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/package.json", 
-      "use": "@vercel/node",
+      "src": "web/package.json",
       "config": {
-        "includeFiles": ["dist/**", "node_modules/**"],
-        "buildCommand": "npm install && npm run build"
+        "maxLambdaSize": "15mb",
+        "installCommand": "npm install",
+        "buildCommand": "npm run build"
       }
     },
     {
-      "src": "web/package.json",
-      "use": "@vercel/vite",
-       "config": {
-         "project": "web/tsconfig.json" 
-       }
+      "src": "api/package.json",
+      "use": "@vercel/node",
+      "config": {
+        "maxLambdaSize": "15mb",
+        "includeFiles": ["dist/**"],
+        "installCommand": "npm install",
+        "buildCommand": "npm run build"
+      }
     }
   ],
   "routes": [
-    { 
+    {
       "src": "/api/(.*)",
       "dest": "/api/dist/main.js"
     },
-    { 
-      "handle": "filesystem" 
-    },
-    { 
-      "src": "/(.*)", 
-      "dest": "/index.html"
-    } 
+    {
+      "src": "/(.*)",
+      "dest": "/web/dist/$1"
+    }
   ]
 }
